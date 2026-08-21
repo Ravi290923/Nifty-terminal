@@ -24,7 +24,7 @@ STOCKS = [
     {"symbol": "NESTLEIND", "name": "Nestle India", "sector": "FMCG", "base": 2385},
     {"symbol": "BRITANNIA", "name": "Britannia Industries", "sector": "FMCG", "base": 5480},
     {"symbol": "MARUTI", "name": "Maruti Suzuki", "sector": "Auto", "base": 12650},
-    {"symbol": "TATAMOTORS", "name": "Tata Motors", "sector": "Auto", "base": 985},
+    {"symbol": "TMPV", "name": "Tata Motors Passenger Vehicles", "sector": "Auto", "base": 985},
     {"symbol": "M&M", "name": "Mahindra & Mahindra", "sector": "Auto", "base": 3120},
     {"symbol": "BAJAJ-AUTO", "name": "Bajaj Auto", "sector": "Auto", "base": 9450},
     {"symbol": "EICHERMOT", "name": "Eicher Motors", "sector": "Auto", "base": 4890},

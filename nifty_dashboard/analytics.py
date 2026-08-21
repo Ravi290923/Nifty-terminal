@@ -145,3 +145,20 @@ def find_fib(df: pd.DataFrame) -> dict:
             {"r": 1, "price": top},
         ]
     return {"levels": levels, "uptrend": uptrend}
+
+
+def atr(df: pd.DataFrame, period: int = 14) -> float:
+    """Average True Range — a volatility measure used to size the ATR-based
+    projected move in targets.py. Simple mean (not Wilder-smoothed) over
+    the trailing `period` bars, which is precise enough for a projection
+    band rather than a precise indicator value.
+    """
+    highs, lows, closes = df["high"].values, df["low"].values, df["close"].values
+    if len(df) < 2:
+        return 0.0
+    trs = []
+    for i in range(1, len(df)):
+        tr = max(highs[i] - lows[i], abs(highs[i] - closes[i - 1]), abs(lows[i] - closes[i - 1]))
+        trs.append(tr)
+    window = trs[-period:] if len(trs) >= period else trs
+    return float(np.mean(window)) if window else 0.0

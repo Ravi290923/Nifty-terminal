@@ -198,15 +198,41 @@ def _norm(name: str) -> str:
     return s
 
 
+def _tokens(s: str) -> set:
+    """Words, lightly stemmed by dropping a trailing 's' (ports -> port,
+    motors -> motor) so plural/singular variants still overlap.
+    """
+    return {w[:-1] if w.endswith("s") and len(w) > 3 else w for w in s.split(" ") if w}
+
+
 def match_msci(company_name: str):
-    """Best-effort fuzzy match from a dashboard company name to an MSCI row."""
+    """Best-effort fuzzy match from a dashboard company name to an MSCI row.
+
+    1. Exact substring containment (either direction) is decisive and
+       returned immediately — e.g. "Tata Motors" is a substring of
+       "tata motors passenger vehicles", so it matches that row directly
+       without ever considering "Tata Consultancy Services".
+    2. Otherwise, score every row by shared word-tokens (stemmed for
+       plurals) and take the best score of 2+ shared words. A single
+       shared word — often just the conglomerate name ("Tata", "Adani",
+       "HDFC") — isn't enough on its own to avoid matching the wrong
+       sibling company.
+    """
     target = _norm(company_name)
-    target_first = target.split(" ")[0] if target else ""
+    if not target:
+        return None
     for row in MSCI_FLOWS:
         fn = _norm(row["stock"])
-        fn_first = fn.split(" ")[0] if fn else ""
-        if fn in target or target in fn:
+        if fn and (fn in target or target in fn):
             return row
-        if fn_first and len(fn_first) > 3 and fn_first == target_first:
-            return row
-    return None
+
+    target_tokens = _tokens(target)
+    best, best_score = None, 1  # require > 1 shared token
+    for row in MSCI_FLOWS:
+        fn = _norm(row["stock"])
+        if not fn:
+            continue
+        score = len(target_tokens & _tokens(fn))
+        if score > best_score:
+            best_score, best = score, row
+    return best

@@ -17,7 +17,7 @@ import pandas as pd
 import streamlit as st
 from dotenv import load_dotenv
 
-from nifty_dashboard import analytics, charts
+from nifty_dashboard import analytics, charts, targets
 from nifty_dashboard.config import STOCKS, TIMEFRAMES, NIFTY_SYMBOL, NIFTY_NAME, NIFTY_BASE
 from nifty_dashboard.data_source import MarketDataProvider
 from nifty_dashboard.msci_data import MSCI_FLOWS, METHODOLOGY, match_msci
@@ -69,7 +69,15 @@ if "tick_streamer" not in st.session_state:
 
 with st.sidebar:
     st.markdown("### Live Data · Upstox")
-    default_token = os.getenv("UPSTOX_ANALYTICS_TOKEN") or os.getenv("UPSTOX_ACCESS_TOKEN") or ""
+    def _secret(name):
+        try:
+            return st.secrets.get(name, "")
+        except Exception:
+            return ""
+    default_token = (
+        os.getenv("UPSTOX_ANALYTICS_TOKEN") or os.getenv("UPSTOX_ACCESS_TOKEN")
+        or _secret("UPSTOX_ANALYTICS_TOKEN") or _secret("UPSTOX_ACCESS_TOKEN") or ""
+    )
     token = st.text_input("Access / analytics token", value=default_token, type="password",
                            help="Put it in .env as UPSTOX_ANALYTICS_TOKEN instead of pasting it here when possible.")
     instruments = {}
@@ -400,3 +408,46 @@ else:
             st.markdown(f'<div class="mono" style="color:{VIOLET};">{nearest["r"]:.3f} level at ₹{nearest["price"]:.2f}</div>', unsafe_allow_html=True)
 
     st.caption("SMC / FVG / Fibonacci markers are rule-based heuristics computed from the candle data above — not investment advice.")
+
+    # --- Price Targets ------------------------------------------------- #
+    st.markdown("## Price Targets")
+    st.caption("Mechanically derived from the structure above (support/resistance, Fibonacci extensions, ATR) — "
+               "not a prediction and not investment advice. No strategy guarantees results; treat this as one input, "
+               "check the \u2018method\u2019 line to see exactly how each number was derived, and always size positions "
+               "against your own risk tolerance.")
+
+    intraday_df, _ = cached_candles(token, instr_json, sym, "1h")
+    swing_df, _ = cached_candles(token, instr_json, sym, "1d")
+    positional_df, _ = cached_candles(token, instr_json, sym, "1d")  # same series; see targets.py docstring on lookback
+
+    t_intraday = targets.intraday_targets(intraday_df, q["ltp"])
+    t_swing = targets.swing_targets(swing_df)
+    t_positional = targets.positional_targets(positional_df)
+
+    tc1, tc2, tc3 = st.columns(3)
+    for col, t in zip([tc1, tc2, tc3], [t_intraday, t_swing, t_positional]):
+        with col:
+            with st.container(border=True):
+                tone = "bull" if t["direction"] == "up" else "bear" if t["direction"] == "down" else "flat"
+                st.markdown(f'#### {t["horizon"]}')
+                st.markdown(badge(tone, f'{t["trend_label"]} ({t["direction"]})'), unsafe_allow_html=True)
+                st.write("")
+                rows = [("Target 1", t["target1"], AMBER), ("Target 2", t["target2"], AMBER)]
+                if t.get("stop") is not None:
+                    rows.append(("Stop-loss", t["stop"], BEAR))
+                for label, val, color in rows:
+                    if val is None:
+                        continue
+                    st.markdown(f'<div style="display:flex;justify-content:space-between;padding:5px 0;'
+                                 f'border-bottom:1px solid {BORDER};"><span style="color:{color};font-size:12.5px;">'
+                                 f'{label}</span><span class="mono">\u20b9{val:.2f}</span></div>', unsafe_allow_html=True)
+                if t.get("risk_reward") is not None:
+                    st.markdown(f'<div style="display:flex;justify-content:space-between;padding:5px 0;">'
+                                 f'<span style="color:{MUTED};font-size:12.5px;">Risk:Reward</span>'
+                                 f'<span class="mono">1 : {t["risk_reward"]:.2f}</span></div>', unsafe_allow_html=True)
+                if t.get("atr_band"):
+                    lo, hi = t["atr_band"]
+                    st.markdown(f'<div style="display:flex;justify-content:space-between;padding:5px 0;">'
+                                 f'<span style="color:{MUTED};font-size:12.5px;">ATR band</span>'
+                                 f'<span class="mono">\u20b9{lo:.2f}\u2013{hi:.2f}</span></div>', unsafe_allow_html=True)
+                st.caption(t["method"])
