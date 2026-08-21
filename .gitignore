@@ -1,0 +1,6 @@
+.env
+instruments.json
+NSE.json.gz
+__pycache__/
+*.pyc
+.streamlit/
